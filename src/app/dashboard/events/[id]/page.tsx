@@ -36,11 +36,30 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   }
   const s = statusLabel[event.status] ?? statusLabel.draft
 
+  // Donut RSVP — cercle SVG maison, pas besoin d'une lib de graphiques pour 3 segments.
+  const chartTotal = confirmedCount + pendingCount + declinedCount
+  const DONUT_R = 58
+  const DONUT_CIRC = 2 * Math.PI * DONUT_R
+  const legend = [
+    { label: 'Confirmés',  value: confirmedCount, color: '#27AE60' },
+    { label: 'En attente', value: pendingCount,   color: '#D4A373' },
+    { label: 'Refusés',    value: declinedCount,  color: '#C0392B' },
+  ]
+  const donutSegments = (() => {
+    let acc = 0
+    return legend.filter(l => l.value > 0).map(l => {
+      const dash = chartTotal > 0 ? (l.value / chartTotal) * DONUT_CIRC : 0
+      const seg = { ...l, dash, offset: -acc }
+      acc += dash
+      return seg
+    })
+  })()
+
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 36 }}>
+      <div style={{ marginBottom: 36 }}>
         <div>
           <Link href="/dashboard" style={{ fontSize: 12, color: '#9B8E7E', textDecoration: 'none', letterSpacing: '0.05em' }}>← Mes événements</Link>
           <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 400, color: '#1A1208', lineHeight: 1.1, marginTop: 8 }}>
@@ -79,7 +98,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
           <CopyLinkButton url={`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://festila.com'}/e/${event.slug}`} />
           <Link href={`/dashboard/events/${id}/edit`} style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, border: '1px solid #EDE3D5', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9B8E7E', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}>
             Modifier
@@ -105,42 +124,79 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         ))}
       </div>
 
-      {/* Liste invités */}
-      <div style={{ background: '#fff', border: '1px solid #EDE3D5', borderRadius: 16, padding: '24px 28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 400, color: '#1A1208' }}>
-            Liste des invités
-          </h2>
-          <ExportGuestsButton guests={guests ?? []} eventTitle={event.title} />
+      {/* Liste invités + répartition */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20, alignItems: 'start' }}>
+
+        <div style={{ background: '#fff', border: '1px solid #EDE3D5', borderRadius: 16, padding: '24px 28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 400, color: '#1A1208' }}>
+              Liste des invités
+            </h2>
+            <ExportGuestsButton guests={guests ?? []} eventTitle={event.title} />
+          </div>
+
+          {!guests?.length ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#9B8E7E' }}>
+              <p style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 20, marginBottom: 8 }}>Aucun invité pour le moment</p>
+              <p style={{ fontSize: 12 }}>Les invités apparaîtront ici dès qu'ils s'inscriront via la vitrine.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {guests.map(guest => (
+                <div key={guest.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#FAF7F3', borderRadius: 10 }}>
+                  <div>
+                    <p style={{ fontSize: 14, color: '#1A1208', fontWeight: 500 }}>{guest.first_name} {guest.last_name}</p>
+                    {guest.group_size > 1 && (
+                      <p style={{ fontSize: 11, color: '#9B8E7E', marginTop: 2 }}>{guest.group_size} personnes au total</p>
+                    )}
+                  </div>
+                  <span style={{
+                    fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
+                    color: guest.status === 'confirmed' ? '#27AE60' : guest.status === 'declined' ? '#C0392B' : '#9B8E7E',
+                    background: guest.status === 'confirmed' ? '#EAF7EE' : guest.status === 'declined' ? '#FDF0EE' : '#F5EFE6',
+                    padding: '3px 10px', borderRadius: 999
+                  }}>
+                    {guest.status === 'confirmed' ? 'Confirmé' : guest.status === 'declined' ? 'Refusé' : 'En attente'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {!guests?.length ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: '#9B8E7E' }}>
-            <p style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 20, marginBottom: 8 }}>Aucun invité pour le moment</p>
-            <p style={{ fontSize: 12 }}>Les invités apparaîtront ici dès qu'ils s'inscriront via la vitrine.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {guests.map(guest => (
-              <div key={guest.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#FAF7F3', borderRadius: 10 }}>
-                <div>
-                  <p style={{ fontSize: 14, color: '#1A1208', fontWeight: 500 }}>{guest.first_name} {guest.last_name}</p>
-                  {guest.group_size > 1 && (
-                    <p style={{ fontSize: 11, color: '#9B8E7E', marginTop: 2 }}>{guest.group_size} personnes au total</p>
-                  )}
-                </div>
-                <span style={{
-                  fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
-                  color: guest.status === 'confirmed' ? '#27AE60' : guest.status === 'declined' ? '#C0392B' : '#9B8E7E',
-                  background: guest.status === 'confirmed' ? '#EAF7EE' : guest.status === 'declined' ? '#FDF0EE' : '#F5EFE6',
-                  padding: '3px 10px', borderRadius: 999
-                }}>
-                  {guest.status === 'confirmed' ? 'Confirmé' : guest.status === 'declined' ? 'Refusé' : 'En attente'}
-                </span>
+        <div style={{ background: '#fff', border: '1px solid #EDE3D5', borderRadius: 16, padding: '24px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 400, color: '#1A1208', alignSelf: 'flex-start', marginBottom: 16 }}>
+            Répartition
+          </h2>
+
+          <svg width="160" height="160" viewBox="0 0 160 160">
+            <g transform="rotate(-90 80 80)">
+              <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="#F5EFE6" strokeWidth="16" />
+              {donutSegments.map(seg => (
+                <circle
+                  key={seg.label}
+                  cx="80" cy="80" r={DONUT_R} fill="none"
+                  stroke={seg.color} strokeWidth="16"
+                  strokeDasharray={`${seg.dash} ${DONUT_CIRC - seg.dash}`}
+                  strokeDashoffset={seg.offset}
+                />
+              ))}
+            </g>
+            <text x="80" y="76" textAnchor="middle" fontSize="30" fontFamily="'Cormorant Garamond', Georgia, serif" fill="#1A1208">{chartTotal}</text>
+            <text x="80" y="94" textAnchor="middle" fontSize="9" letterSpacing="0.1em" fill="#9B8E7E">INVITÉS</text>
+          </svg>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', marginTop: 20 }}>
+            {legend.map(l => (
+              <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#6B5E50' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: l.color, flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{l.label}</span>
+                <span style={{ color: '#1A1208', fontWeight: 500 }}>{l.value}</span>
               </div>
             ))}
           </div>
-        )}
+        </div>
+
       </div>
 
       {/* Zone danger */}
