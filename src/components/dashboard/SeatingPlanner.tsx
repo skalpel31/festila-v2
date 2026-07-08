@@ -11,44 +11,28 @@ import {
 } from '@/app/dashboard/events/[id]/plan/actions'
 
 type EventTable = { id: string; event_id: string; name: string; shape: Shape; seats: number; pos_x: number; pos_y: number; rotation: number }
-type Guest = { id: string; first_name: string; last_name: string; group_size: number; status: string; table_id: string | null }
+type Guest = { id: string; first_name: string; last_name: string; group_size: number; status: string; table_id: string | null; seat_x: number | null; seat_y: number | null }
 
 const C = { navy: '#0D1323', rose: '#E787B2', or: '#D4A373', sand: '#9B8E7E', border: '#E0D8D0' }
 const AVATAR = 30
+const DROP_THRESHOLD = 140 // px — distance max au centre d'une table pour qu'un dépose d'invité compte comme "sur cette table"
 
 function dragData(e: React.DragEvent): { kind: 'guest' | 'table'; id: string } | null {
   try { return JSON.parse(e.dataTransfer.getData('text/plain')) } catch { return null }
 }
 
-// Positions des vignettes invités autour du pourtour de la table (repère local, non tourné —
-// la rotation de la table s'applique via le transform CSS du conteneur parent).
-function seatOffsets(shape: Shape, count: number, w: number, h: number) {
-  const OUT = 20
-  const offsets: { x: number; y: number }[] = []
-  if (count === 0) return offsets
-  if (shape === 'round') {
-    const r = w / 2 + OUT
-    for (let i = 0; i < count; i++) {
-      const angle = (2 * Math.PI * i) / count - Math.PI / 2
-      offsets.push({ x: r * Math.cos(angle), y: r * Math.sin(angle) })
-    }
-  } else {
-    const hw = w / 2 + OUT, hh = h / 2 + OUT
-    const segLens = [2 * hw, 2 * hh, 2 * hw, 2 * hh]
-    const total = segLens.reduce((a, b) => a + b, 0)
-    for (let i = 0; i < count; i++) {
-      let d = (total / count) * i
-      let seg = 0
-      while (d > segLens[seg]) { d -= segLens[seg]; seg++ }
-      let x = 0, y = 0
-      if (seg === 0)      { x = -hw + d; y = -hh }
-      else if (seg === 1) { x = hw;      y = -hh + d }
-      else if (seg === 2) { x = hw - d;  y = hh }
-      else                { x = -hw;     y = hh - d }
-      offsets.push({ x, y })
-    }
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n))
+}
+
+// Convertit un delta écran (par rapport au centre de la table) en repère local
+// non tourné — nécessaire car la table peut être pivotée.
+function toLocal(dx: number, dy: number, deg: number) {
+  const rad = (deg * Math.PI) / 180
+  return {
+    x: dx * Math.cos(rad) + dy * Math.sin(rad),
+    y: -dx * Math.sin(rad) + dy * Math.cos(rad),
   }
-  return offsets
 }
 
 function initialsOf(g: Guest) {
@@ -136,30 +120,47 @@ export default function SeatingPlanner({
     router.refresh()
   }
 
-  function handleCanvasDrop(e: React.DragEvent) {
-    const data = dragData(e)
-    if (!data || data.kind !== 'table' || !canvasRef.current) return
-    const rect = canvasRef.current.getBoundingClientRect()
-    const x = Math.min(94, Math.max(6, ((e.clientX - rect.left) / rect.width) * 100))
-    const y = Math.min(90, Math.max(10, ((e.clientY - rect.top) / rect.height) * 100))
-    setLocalTables(prev => prev.map(t => t.id === data.id ? { ...t, pos_x: x, pos_y: y } : t))
-    updateTable(eventId, data.id, { pos_x: x, pos_y: y }).then(() => router.refresh())
+  function tableCenterScreen(table: EventTable, rect: DOMRect) {
+    return { x: rect.left + (table.pos_x / 100) * rect.width, y: rect.top + (table.pos_y / 100) * rect.height }
   }
 
-  function handleDropOnTable(e: React.DragEvent, tableId: string) {
-    e.stopPropagation()
+  function handleCanvasDrop(e: React.DragEvent) {
     const data = dragData(e)
-    if (!data || data.kind !== 'guest') return
-    setLocalGuests(prev => prev.map(g => g.id === data.id ? { ...g, table_id: tableId } : g))
-    assignGuestToTable(eventId, data.id, tableId).then(() => router.refresh())
+    if (!data || !canvasRef.current) return
+    const rect = canvasRef.current.getBoundingClientRect()
+
+    if (data.kind === 'table') {
+      const x = clamp(((e.clientX - rect.left) / rect.width) * 100, 6, 94)
+      const y = clamp(((e.clientY - rect.top) / rect.height) * 100, 10, 90)
+      setLocalTables(prev => prev.map(t => t.id === data.id ? { ...t, pos_x: x, pos_y: y } : t))
+      updateTable(eventId, data.id, { pos_x: x, pos_y: y }).then(() => router.refresh())
+      return
+    }
+
+    // Invité déposé : on cherche la table la plus proche du point de dépose.
+    let nearest: EventTable | null = null
+    let nearestDist = Infinity
+    for (const t of localTables) {
+      const c = tableCenterScreen(t, rect)
+      const d = Math.hypot(e.clientX - c.x, e.clientY - c.y)
+      if (d < nearestDist) { nearestDist = d; nearest = t }
+    }
+    if (!nearest || nearestDist > DROP_THRESHOLD) return
+
+    const c = tableCenterScreen(nearest, rect)
+    const local = toLocal(e.clientX - c.x, e.clientY - c.y, nearest.rotation)
+    const tableId = nearest.id
+    setLocalGuests(prev => prev.map(g => g.id === data.id ? { ...g, table_id: tableId, seat_x: local.x, seat_y: local.y } : g))
+    assignGuestToTable(eventId, data.id, tableId, local.x, local.y).then(() => router.refresh())
   }
 
   function unassignGuest(guestId: string) {
-    setLocalGuests(prev => prev.map(g => g.id === guestId ? { ...g, table_id: null } : g))
+    setLocalGuests(prev => prev.map(g => g.id === guestId ? { ...g, table_id: null, seat_x: null, seat_y: null } : g))
     assignGuestToTable(eventId, guestId, null).then(() => router.refresh())
   }
 
-  async function handleDeleteTable(tableId: string) {
+  async function handleDeleteTable(tableId: string, name: string) {
+    if (!window.confirm(`Supprimer "${name}" ? Les invités qui y sont assignés repasseront en "non assignés".`)) return
     setSelectedId(null)
     setLocalTables(prev => prev.filter(t => t.id !== tableId))
     await deleteTable(eventId, tableId)
@@ -235,9 +236,6 @@ export default function SeatingPlanner({
                 style={{ width: 50, border: `1px solid ${C.border}`, borderRadius: 6, padding: '5px 8px', fontSize: 12, fontFamily: "'Inter', system-ui, sans-serif" }}
               />
             </div>
-            <button onClick={() => handleDeleteTable(selectedTable.id)} style={{ background: 'none', border: 'none', color: '#C0392B', fontSize: 11.5, cursor: 'pointer', textDecoration: 'underline', fontFamily: "'Inter', system-ui, sans-serif" }}>
-              Supprimer
-            </button>
             <button onClick={() => setSelectedId(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.sand, fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>
               ×
             </button>
@@ -262,7 +260,6 @@ export default function SeatingPlanner({
             const isRound = table.shape === 'round'
             const w = isRound ? 96 : 140
             const h = isRound ? 96 : 68
-            const offsets = seatOffsets(table.shape, assigned.length, w, h)
             const selected = selectedId === table.id
             return (
               <div
@@ -274,10 +271,6 @@ export default function SeatingPlanner({
                 }}
               >
                 <div
-                  draggable
-                  onDragStart={e => e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'table', id: table.id }))}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => handleDropOnTable(e, table.id)}
                   onClick={() => setSelectedId(table.id)}
                   style={{
                     width: w, height: h,
@@ -285,13 +278,22 @@ export default function SeatingPlanner({
                     background: selected ? '#FDEEF5' : '#fff',
                     border: `2px solid ${over ? '#C0392B' : selected ? C.rose : C.border}`,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'grab', boxShadow: '0 2px 10px rgba(13,19,35,0.08)', padding: 8,
+                    cursor: 'pointer', boxShadow: '0 2px 10px rgba(13,19,35,0.08)', padding: 8,
                     userSelect: 'none', textAlign: 'center',
                   }}
                 >
                   <p style={{ fontSize: 11.5, fontWeight: 600, color: '#1A1208', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{table.name}</p>
                   <p style={{ fontSize: 10, color: over ? '#C0392B' : C.sand, marginTop: 2 }}>{used}/{table.seats}</p>
                 </div>
+
+                {/* Supprimer — directement sur la table */}
+                <button
+                  onClick={e => { e.stopPropagation(); handleDeleteTable(table.id, table.name) }}
+                  title="Supprimer la table"
+                  style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: '50%', background: '#C0392B', color: '#fff', border: '2px solid #fff', fontSize: 12, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
+                >
+                  ×
+                </button>
 
                 {/* Poignée de rotation */}
                 <div
@@ -300,21 +302,35 @@ export default function SeatingPlanner({
                   style={{ position: 'absolute', top: -26, left: '50%', transform: 'translate(-50%, 0)', width: 14, height: 14, borderRadius: '50%', background: '#fff', border: `2px solid ${C.navy}`, cursor: 'grab' }}
                 />
 
-                {/* Vignettes des invités assignés, réparties autour de la table */}
-                {assigned.map((g, i) => (
-                  <div
-                    key={g.id}
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={e => handleDropOnTable(e, table.id)}
-                    style={{
-                      position: 'absolute',
-                      left: w / 2 + offsets[i].x, top: h / 2 + offsets[i].y,
-                      transform: `translate(-50%, -50%) rotate(${-table.rotation}deg)`,
-                    }}
-                  >
-                    <GuestAvatar guest={g} onRemove={() => unassignGuest(g.id)} />
-                  </div>
-                ))}
+                {/* Poignée de déplacement */}
+                <div
+                  draggable
+                  onDragStart={e => e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'table', id: table.id }))}
+                  title="Déplacer la table"
+                  style={{ position: 'absolute', bottom: -26, left: '50%', transform: 'translate(-50%, 0)', width: 22, height: 22, borderRadius: '50%', background: '#fff', border: `2px solid ${C.navy}`, cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20" />
+                  </svg>
+                </div>
+
+                {/* Vignettes des invités — position libre, mémorisée par invité */}
+                {assigned.map(g => {
+                  const lx = g.seat_x ?? 0
+                  const ly = g.seat_y ?? -(h / 2 + 24)
+                  return (
+                    <div
+                      key={g.id}
+                      style={{
+                        position: 'absolute',
+                        left: w / 2 + lx, top: h / 2 + ly,
+                        transform: `translate(-50%, -50%) rotate(${-table.rotation}deg)`,
+                      }}
+                    >
+                      <GuestAvatar guest={g} onRemove={() => unassignGuest(g.id)} />
+                    </div>
+                  )
+                })}
               </div>
             )
           })}
@@ -339,7 +355,7 @@ export default function SeatingPlanner({
           </div>
         )}
         <p style={{ fontSize: 11, color: C.sand, marginTop: 16, lineHeight: 1.6 }}>
-          Glisse un invité sur une table pour l'assigner, ou une vignette de la table jusqu'ici pour le retirer.
+          Glisse un invité où tu veux sur ou autour d'une table pour l'assigner, ou une vignette jusqu'ici pour le retirer.
         </p>
       </div>
 
