@@ -41,9 +41,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const DONUT_R = 58
   const DONUT_CIRC = 2 * Math.PI * DONUT_R
   const legend = [
-    { label: 'Confirmés',  value: confirmedCount, color: '#27AE60' },
+    { label: 'Confirmés',  value: confirmedCount, color: '#8AA88F' },
     { label: 'En attente', value: pendingCount,   color: '#D4A373' },
-    { label: 'Refusés',    value: declinedCount,  color: '#C0392B' },
+    { label: 'Refusés',    value: declinedCount,  color: '#C17767' },
   ]
   const donutSegments = (() => {
     let acc = 0
@@ -59,8 +59,8 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
 
       {/* Header */}
-      <div style={{ marginBottom: 36 }}>
-        <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, marginBottom: 36 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <Link href="/dashboard" style={{ fontSize: 12, color: '#9B8E7E', textDecoration: 'none', letterSpacing: '0.05em' }}>← Mes événements</Link>
           <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 400, color: '#1A1208', lineHeight: 1.1, marginTop: 8 }}>
             {event.title}
@@ -98,12 +98,12 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0, justifyContent: 'flex-end', maxWidth: 340 }}>
           <CopyLinkButton url={`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://festila.com'}/e/${event.slug}`} />
-          <Link href={`/dashboard/events/${id}/edit`} style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, border: '1px solid #EDE3D5', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9B8E7E', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}>
+          <Link href={`/dashboard/events/${id}/edit`} style={{ display: 'inline-flex', alignItems: 'center', padding: '8px 14px', borderRadius: 999, border: '1px solid #EDE3D5', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9B8E7E', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}>
             Modifier
           </Link>
-          <Link href={`/e/${event.slug}`} target="_blank" style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, background: '#E787B2', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 600, boxShadow: '0 4px 14px rgba(231,135,178,0.35)' }}>
+          <Link href={`/e/${event.slug}`} target="_blank" style={{ display: 'inline-flex', alignItems: 'center', padding: '8px 14px', borderRadius: 999, background: '#E787B2', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#fff', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 600, boxShadow: '0 4px 14px rgba(231,135,178,0.35)' }}>
             Voir la vitrine →
           </Link>
         </div>
@@ -125,7 +125,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       </div>
 
       {/* Liste invités + répartition */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
 
         <div style={{ background: '#fff', border: '1px solid #EDE3D5', borderRadius: 16, padding: '24px 28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -169,7 +169,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             Répartition
           </h2>
 
-          <svg width="160" height="160" viewBox="0 0 160 160">
+          <svg width="160" height="160" viewBox="0 0 160 160" style={{ width: '100%', maxWidth: 160, height: 'auto' }}>
             <g transform="rotate(-90 80 80)">
               <circle cx="80" cy="80" r={DONUT_R} fill="none" stroke="#F5EFE6" strokeWidth="16" />
               {donutSegments.map(seg => (

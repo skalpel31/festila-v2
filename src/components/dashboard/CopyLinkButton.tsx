@@ -16,10 +16,10 @@ export default function CopyLinkButton({ url }: { url: string }) {
       onClick={handleCopy}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 7,
-        padding: '10px 20px', borderRadius: 999,
+        padding: '8px 14px', borderRadius: 999,
         border: '1px solid #EDE3D5',
         background: copied ? '#EAF4EE' : '#fff',
-        fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
+        fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase',
         color: copied ? '#2D8653' : '#9B8E7E',
         cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif",
         transition: 'all 0.2s'
