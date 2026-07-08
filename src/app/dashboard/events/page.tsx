@@ -91,9 +91,7 @@ export default async function EventsListPage() {
                     <span style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: s.color, background: s.bg, padding: '4px 12px', borderRadius: 999, fontWeight: 600 }}>
                       {s.label}
                     </span>
-                    <div onClick={e => e.preventDefault()}>
-                      <DeleteEventInline eventId={event.id} eventTitle={event.title} />
-                    </div>
+                    <DeleteEventInline eventId={event.id} eventTitle={event.title} />
                     <span style={{ color: '#D4C9BB', fontSize: 18 }}>›</span>
                   </div>
 

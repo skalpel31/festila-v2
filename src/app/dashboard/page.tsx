@@ -63,7 +63,7 @@ function EventRow({ event, guestStats, muted }: {
           {s.label}
         </span>
 
-        <div onClick={e => e.preventDefault()} style={{ flexShrink: 0 }}>
+        <div style={{ flexShrink: 0 }}>
           <DeleteEventInline eventId={event.id} eventTitle={event.title} />
         </div>
 
