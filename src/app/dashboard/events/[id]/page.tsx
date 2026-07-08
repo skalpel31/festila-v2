@@ -98,7 +98,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0, justifyContent: 'flex-end', maxWidth: 340 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0, justifyContent: 'flex-end' }}>
           <CopyLinkButton url={`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://festila.com'}/e/${event.slug}`} />
           <Link href={`/dashboard/events/${id}/edit`} style={{ display: 'inline-flex', alignItems: 'center', padding: '8px 14px', borderRadius: 999, border: '1px solid #EDE3D5', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9B8E7E', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}>
             Modifier
