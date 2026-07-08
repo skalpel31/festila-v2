@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -16,8 +16,9 @@ function EyeIcon({ open }: { open: boolean }) {
   )
 }
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [password,  setPassword]  = useState('')
   const [confirm,   setConfirm]   = useState('')
   const [showPwd,   setShowPwd]   = useState(false)
@@ -25,14 +26,19 @@ export default function ResetPasswordPage() {
   const [loading,   setLoading]   = useState(false)
   const [error,     setError]     = useState('')
   const [ready,     setReady]     = useState(false)
+  const [linkError, setLinkError] = useState(false)
 
   useEffect(() => {
-    // Supabase injecte la session via le hash de l'URL (#access_token=...)
+    // Le lien de reset Supabase (flux PKCE) redirige vers /reset-password?code=...
+    const code = searchParams.get('code')
+    if (!code) { setLinkError(true); return }
+
     const supabase = createClient()
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
+    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      if (error) { setLinkError(true); return }
+      setReady(true)
     })
-  }, [])
+  }, [searchParams])
 
   const strength = password.length === 0 ? 0 : password.length < 6 ? 1 : password.length < 10 ? 2 : 3
   const strengthColor = ['', '#C0392B', '#E67E22', '#27AE60'][strength]
@@ -73,7 +79,16 @@ export default function ResetPasswordPage() {
             Choisissez un nouveau mot de passe sécurisé
           </p>
 
-          {!ready ? (
+          {linkError ? (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <p style={{ fontSize: 13, color: '#C0392B', marginBottom: 16 }}>
+                Ce lien de réinitialisation est invalide ou a expiré.
+              </p>
+              <a href="/forgot-password" style={{ fontSize: 12, color: '#E787B2', textDecoration: 'none' }}>
+                Demander un nouveau lien →
+              </a>
+            </div>
+          ) : !ready ? (
             <p style={{ fontSize: 13, color: '#9B8E7E', textAlign: 'center', padding: '20px 0' }}>
               Vérification du lien en cours…
             </p>
@@ -145,5 +160,13 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
   )
 }

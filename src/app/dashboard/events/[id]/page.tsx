@@ -8,6 +8,7 @@ import ExportGuestsButton from '@/components/dashboard/ExportGuestsButton'
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: event } = await supabase
     .from('events')
@@ -15,7 +16,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     .eq('id', id)
     .single()
 
-  if (!event) notFound()
+  if (!event || event.organizer_id !== user?.id) notFound()
 
   const { data: guests } = await supabase
     .from('event_guests')

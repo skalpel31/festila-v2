@@ -18,25 +18,28 @@ export async function deleteUser(userId: string) {
 
   if (userId === me.id) throw new Error('Impossible de supprimer votre propre compte')
 
+  // Toutes les suppressions passent par le client admin (service role) pour
+  // contourner les RLS — un admin n'est pas propriétaire des lignes qu'il supprime.
+  const admin = createAdminClient()
+
   // Supprimer les données dans l'ordre (invités → événements de l'user → profil → auth)
-  const { data: userEvents } = await supabase
+  const { data: userEvents } = await admin
     .from('events')
     .select('id')
     .eq('organizer_id', userId)
 
   if (userEvents?.length) {
-    await supabase.from('event_guests').delete().in('event_id', userEvents.map(e => e.id))
-    await supabase.from('events').delete().eq('organizer_id', userId)
+    await admin.from('event_guests').delete().in('event_id', userEvents.map(e => e.id))
+    await admin.from('events').delete().eq('organizer_id', userId)
   }
 
   // RSVP où l'user est invité
-  await supabase.from('event_guests').delete().eq('user_id', userId)
+  await admin.from('event_guests').delete().eq('user_id', userId)
 
   // Profil
-  await supabase.from('profiles').delete().eq('id', userId)
+  await admin.from('profiles').delete().eq('id', userId)
 
   // Compte auth (nécessite service role)
-  const admin = createAdminClient()
   const { error } = await admin.auth.admin.deleteUser(userId)
   if (error) throw new Error(`Erreur suppression auth: ${error.message}`)
 

@@ -39,8 +39,9 @@ export default function EditEventPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
       const { data: event } = await supabase.from('events').select('*').eq('id', id).single()
-      if (!event) { router.push('/dashboard'); return }
+      if (!event || event.organizer_id !== user?.id) { router.push('/dashboard'); return }
       setTitle(event.title ?? '')
       setDescription(event.description ?? '')
       setEventDate(event.event_date ?? '')
@@ -78,6 +79,7 @@ export default function EditEventPage() {
     setLoading(true); setError('')
 
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase.from('events').update({
       title:        title.trim(),
       description:  description.trim() || null,
@@ -87,7 +89,7 @@ export default function EditEventPage() {
       status,
       event_type:   eventType === 'Autre' ? (customType.trim() || 'Autre') : (eventType || null),
       cover_image:  coverImage,
-    }).eq('id', id)
+    }).eq('id', id).eq('organizer_id', user?.id ?? '')
 
     if (error) { setError('Erreur lors de la sauvegarde. Réessayez.'); setLoading(false); return }
     router.push(`/dashboard/events/${id}`)

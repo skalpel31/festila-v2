@@ -12,8 +12,9 @@ export default function DeleteEventButton({ eventId }: { eventId: string }) {
   async function handleDelete() {
     setLoading(true)
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('event_guests').delete().eq('event_id', eventId)
-    await supabase.from('events').delete().eq('id', eventId)
+    await supabase.from('events').delete().eq('id', eventId).eq('organizer_id', user?.id ?? '')
     router.push('/dashboard/events')
   }
 

@@ -16,13 +16,15 @@ export default async function VitrinePage({ params }: { params: Promise<{ slug: 
     .eq('slug', slug)
     .single()
 
-  // Si non trouvé via RLS, contourne avec le client admin (quiconque a le lien peut voir)
+  // Si non trouvé via RLS, contourne avec le client admin — mais seulement pour
+  // les événements publiés : un brouillon ne doit jamais être visible publiquement.
   if (!event) {
     const admin = createAdminClient()
     const { data: adminEvent } = await admin
       .from('events')
       .select('*, profiles(first_name, last_name)')
       .eq('slug', slug)
+      .eq('status', 'published')
       .single()
     if (adminEvent) event = adminEvent
   }
