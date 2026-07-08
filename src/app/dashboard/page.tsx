@@ -1,10 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import InvitationCard from '@/components/dashboard/InvitationCard'
-import QRShareCard from '@/components/dashboard/QRShareCard'
-import CoverAndHeroCard from '@/components/dashboard/CoverAndHeroCard'
+import DeleteEventInline from '@/components/dashboard/DeleteEventInline'
 
 const C = { navy: '#0D1323', rose: '#E787B2', or: '#D4A373', cream: '#FAF7F3', blush: '#F7D9D2', sand: '#9B8E7E', white: '#fff' }
+
+const STATUS: Record<string, { label: string; color: string; bg: string }> = {
+  draft:     { label: 'Brouillon', color: '#9B8E7E', bg: '#F5EFE6' },
+  published: { label: 'Publié',    color: '#2D8653', bg: '#EAF4EE' },
+  closed:    { label: 'Terminé',   color: '#C0392B', bg: '#FDF0EE' },
+}
 
 function daysUntil(dateStr: string) {
   const today = new Date(); today.setHours(0,0,0,0)
@@ -14,14 +19,65 @@ function daysUntil(dateStr: string) {
 
 function CalIcon()   { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4A373" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> }
 function UsersIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4A373" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg> }
-function CheckIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4A373" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> }
+function ClockIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4A373" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> }
+
+function EventRow({ event, guestStats, muted }: {
+  event: any
+  guestStats?: { confirmed: number; pending: number }
+  muted?: boolean
+}) {
+  const s = STATUS[event.status] ?? STATUS.draft
+  const dateFormatted = event.event_date
+    ? new Date(event.event_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null
+
+  return (
+    <Link href={`/dashboard/events/${event.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+      <div style={{
+        background: C.white, border: '1px solid #EDE3D5', borderRadius: 14, padding: '18px 22px',
+        display: 'flex', alignItems: 'center', gap: 18, opacity: muted ? 0.65 : 1,
+        boxShadow: '0px 4px 12px rgba(13,19,35,0.04)',
+      }}>
+        <div style={{ width: 56, height: 56, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: C.navy }}>
+          {event.cover_image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={event.cover_image} alt={event.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: 'rgba(212,163,115,0.4)' }}>✦</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 17, fontWeight: 600, color: C.navy, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {event.title}
+          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {dateFormatted && <span style={{ fontSize: 12, color: C.sand }}>{dateFormatted}</span>}
+            {guestStats && <span style={{ fontSize: 12, color: C.sand }}>· {guestStats.confirmed} confirmé{guestStats.confirmed > 1 ? 's' : ''}</span>}
+          </div>
+        </div>
+
+        <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: s.color, background: s.bg, padding: '4px 11px', borderRadius: 999, fontWeight: 600, flexShrink: 0 }}>
+          {s.label}
+        </span>
+
+        <div onClick={e => e.preventDefault()} style={{ flexShrink: 0 }}>
+          <DeleteEventInline eventId={event.id} eventTitle={event.title} />
+        </div>
+
+        <span style={{ color: '#D4C9BB', fontSize: 18, flexShrink: 0 }}>›</span>
+      </div>
+    </Link>
+  )
+}
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ viewAs?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const { viewAs } = await searchParams
 
-  // Vérifier si super admin pour autoriser le viewAs
   const { data: myProfile } = await supabase.from('profiles').select('first_name, is_super_admin').eq('id', user!.id).single()
   const targetId = (viewAs && myProfile?.is_super_admin) ? viewAs : user!.id
   const isViewingAs = targetId !== user!.id
@@ -30,10 +86,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     ? await supabase.from('profiles').select('first_name').eq('id', targetId).single()
     : { data: myProfile }
 
-  // Événements organisés
   const { data: events } = await supabase.from('events').select('*').eq('organizer_id', targetId).order('event_date', { ascending: true })
 
-  // Invitations reçues
   const { data: invitations } = await supabase
     .from('event_guests')
     .select('*, events(id, title, slug, event_date, event_time, location, status, event_type, organizer_id)')
@@ -43,16 +97,26 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const hasEvents      = (events?.length ?? 0) > 0
   const hasInvitations = (invitations?.length ?? 0) > 0
 
-  // Données pour la vue organisateur
-  const nextEvent = events?.find(e => e.event_date && daysUntil(e.event_date) >= 0) ?? events?.[0]
-  const { data: guests } = nextEvent
-    ? await supabase.from('event_guests').select('status, group_size').eq('event_id', nextEvent.id)
+  const upcomingEvents = events?.filter(e => !e.event_date || daysUntil(e.event_date) >= 0) ?? []
+  const pastEvents     = events?.filter(e => e.event_date && daysUntil(e.event_date) < 0) ?? []
+
+  const upcomingIds = upcomingEvents.map(e => e.id)
+  const { data: allGuests } = upcomingIds.length
+    ? await supabase.from('event_guests').select('event_id, status, group_size').in('event_id', upcomingIds)
     : { data: [] }
 
-  const confirmed = guests?.filter(g => g.status === 'confirmed').reduce((s, g) => s + (g.group_size ?? 1), 0) ?? 0
-  const pending   = guests?.filter(g => g.status === 'pending').reduce((s, g) => s + (g.group_size ?? 1), 0) ?? 0
-  const total     = confirmed + pending
-  const daysLeft  = nextEvent?.event_date ? daysUntil(nextEvent.event_date) : null
+  const guestStatsByEvent = new Map<string, { confirmed: number; pending: number }>()
+  allGuests?.forEach(g => {
+    const cur = guestStatsByEvent.get(g.event_id) ?? { confirmed: 0, pending: 0 }
+    if (g.status === 'confirmed') cur.confirmed += g.group_size ?? 1
+    if (g.status === 'pending')   cur.pending   += g.group_size ?? 1
+    guestStatsByEvent.set(g.event_id, cur)
+  })
+
+  const totalConfirmed = [...guestStatsByEvent.values()].reduce((s, v) => s + v.confirmed, 0)
+  const nearestDays = upcomingEvents.find(e => e.event_date)?.event_date
+    ? daysUntil(upcomingEvents.find(e => e.event_date)!.event_date)
+    : null
 
   // Données organisateurs pour les cartes invitations
   const organizerIds = [...new Set(invitations?.map((inv: any) => inv.events?.organizer_id).filter(Boolean) ?? [])]
@@ -61,7 +125,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     : { data: [] }
   const organizerMap = Object.fromEntries((organizers ?? []).map((p: any) => [p.id, p]))
 
-  // Invitations à venir (non passées)
   const upcomingInvitations = invitations?.filter((inv: any) => {
     if (!inv.events?.event_date) return true
     return daysUntil(inv.events.event_date) >= 0
@@ -70,7 +133,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   return (
     <div>
 
-      {/* Bannière admin quand on visualise un autre utilisateur */}
       {isViewingAs && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', marginBottom: 24, background: 'rgba(212,163,115,0.08)', border: '1px solid rgba(212,163,115,0.2)', borderRadius: 10 }}>
           <p style={{ fontSize: 12, color: C.or, fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -90,7 +152,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </h1>
           <p style={{ fontSize: 13, color: C.sand, marginTop: 5 }}>
             {hasEvents
-              ? 'Voici l\'état actuel de votre événement'
+              ? `${upcomingEvents.length} événement${upcomingEvents.length > 1 ? 's' : ''} à venir${pastEvents.length ? ` · ${pastEvents.length} passé${pastEvents.length > 1 ? 's' : ''}` : ''}`
               : hasInvitations
                 ? `${upcomingInvitations.length} invitation${upcomingInvitations.length > 1 ? 's' : ''} à venir`
                 : 'Votre espace événement personnel'}
@@ -101,14 +163,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </Link>
       </div>
 
-      {/* VUE ORGANISATEUR */}
-      {hasEvents && nextEvent && (
+      {/* VUE ORGANISATEUR — synthèse multi-événements */}
+      {hasEvents && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
             {[
-              { icon: <CalIcon />,   value: daysLeft !== null && daysLeft >= 0 ? daysLeft : '—', label: 'jours restants' },
-              { icon: <UsersIcon />, value: confirmed,                                            label: 'invités confirmés' },
-              { icon: <CheckIcon />, value: total,                                                label: 'total personnes' },
+              { icon: <CalIcon />,   value: upcomingEvents.length,                          label: 'événements à venir' },
+              { icon: <UsersIcon />, value: totalConfirmed,                                  label: 'invités confirmés (total)' },
+              { icon: <ClockIcon />, value: nearestDays !== null && nearestDays >= 0 ? nearestDays : '—', label: 'jours avant le prochain' },
             ].map((stat, i) => (
               <div key={i} style={{ background: C.white, borderRadius: 12, padding: '20px 22px', border: '1px solid #EDE3D5', boxShadow: '0px 4px 12px rgba(13,19,35,0.06)' }}>
                 <div style={{ marginBottom: 10 }}>{stat.icon}</div>
@@ -118,58 +180,31 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.4fr 0.8fr', gap: 16, marginBottom: hasInvitations ? 32 : 0 }}>
-
-            <QRShareCard
-              title={nextEvent.title}
-              slug={nextEvent.slug ?? ''}
-              status={nextEvent.status}
-              eventId={nextEvent.id}
-            />
-
-            <CoverAndHeroCard
-              eventId={nextEvent.id}
-              eventTitle={nextEvent.title}
-              coverImage={nextEvent.cover_image ?? null}
-              coverImageMobile={nextEvent.cover_image_mobile ?? null}
-              slug={nextEvent.slug ?? ''}
-            />
-
-            <div style={{ background: C.white, borderRadius: 12, padding: '24px', border: '1px solid #EDE3D5', boxShadow: '0px 4px 12px rgba(13,19,35,0.06)' }}>
-              <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 16, fontWeight: 600, color: C.navy, marginBottom: 18 }}>Réponses des invités</h2>
-              {total === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <p style={{ fontSize: 13, color: C.sand, lineHeight: 1.8 }}>Aucune réponse pour l'instant.</p>
-                  <Link href={`/e/${nextEvent.slug}`} target="_blank" style={{ display: 'inline-block', marginTop: 12, fontSize: 12, color: C.or, fontWeight: 500, textDecoration: 'none' }}>Partager la vitrine →</Link>
-                </div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-                    <svg width="100" height="100" viewBox="0 0 36 36">
-                      <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F0EBE4" strokeWidth="3.2"/>
-                      <circle cx="18" cy="18" r="15.9" fill="none" stroke="#2D8653" strokeWidth="3.2"
-                        strokeDasharray={`${(confirmed/total)*100} ${100-(confirmed/total)*100}`}
-                        strokeDashoffset="25" strokeLinecap="round"/>
-                      <text x="18" y="19" textAnchor="middle" fontSize="7" fontWeight="bold" fill="#0D1323" fontFamily="Playfair Display, serif">{Math.round((confirmed/total)*100)}%</text>
-                      <text x="18" y="25" textAnchor="middle" fontSize="3.5" fill="#9B8E7E" fontFamily="Inter, sans-serif">acceptés</text>
-                    </svg>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[{ label: 'Acceptés', value: confirmed, color: '#2D8653' }, { label: 'En attente', value: pending, color: C.or }].map(r => (
-                      <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: r.color }} />
-                          <span style={{ fontSize: 12, color: C.navy }}>{r.label}</span>
-                        </div>
-                        <span style={{ fontSize: 12, color: C.sand, fontWeight: 500 }}>{r.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <Link href={`/dashboard/events/${nextEvent.id}`} style={{ display: 'block', marginTop: 16, fontSize: 12, color: C.or, fontWeight: 500, textDecoration: 'none' }}>Voir la liste →</Link>
-                </>
-              )}
+          {upcomingEvents.length > 0 && (
+            <div style={{ marginBottom: pastEvents.length ? 28 : 32 }}>
+              <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 18, fontWeight: 600, color: C.navy, marginBottom: 14 }}>
+                Événements à venir
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {upcomingEvents.map(event => (
+                  <EventRow key={event.id} event={event} guestStats={guestStatsByEvent.get(event.id)} />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {pastEvents.length > 0 && (
+            <div style={{ marginBottom: 32 }}>
+              <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 18, fontWeight: 600, color: C.sand, marginBottom: 14 }}>
+                Événements passés
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {pastEvents.map(event => (
+                  <EventRow key={event.id} event={event} muted />
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 

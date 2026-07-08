@@ -4,6 +4,8 @@ import Link from 'next/link'
 import CopyLinkButton from '@/components/dashboard/CopyLinkButton'
 import DeleteEventButton from '@/components/dashboard/DeleteEventButton'
 import ExportGuestsButton from '@/components/dashboard/ExportGuestsButton'
+import QRShareCard from '@/components/dashboard/QRShareCard'
+import CoverAndHeroCard from '@/components/dashboard/CoverAndHeroCard'
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -107,6 +109,18 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             Voir la vitrine →
           </Link>
         </div>
+      </div>
+
+      {/* QR code / partage + éditeur de couverture */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, marginBottom: 32 }}>
+        <QRShareCard title={event.title} slug={event.slug ?? ''} status={event.status} eventId={id} />
+        <CoverAndHeroCard
+          eventId={id}
+          eventTitle={event.title}
+          coverImage={event.cover_image ?? null}
+          coverImageMobile={event.cover_image_mobile ?? null}
+          slug={event.slug ?? ''}
+        />
       </div>
 
       {/* Stats */}

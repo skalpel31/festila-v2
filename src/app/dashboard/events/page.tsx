@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import DeleteEventInline from '@/components/dashboard/DeleteEventInline'
 
 const STATUS: Record<string, { label: string; color: string; bg: string }> = {
   draft:     { label: 'Brouillon', color: '#9B8E7E', bg: '#F5EFE6' },
@@ -85,11 +86,14 @@ export default async function EventsListPage() {
                     </div>
                   </div>
 
-                  {/* Statut + flèche */}
+                  {/* Statut + suppression + flèche */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                     <span style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: s.color, background: s.bg, padding: '4px 12px', borderRadius: 999, fontWeight: 600 }}>
                       {s.label}
                     </span>
+                    <div onClick={e => e.preventDefault()}>
+                      <DeleteEventInline eventId={event.id} eventTitle={event.title} />
+                    </div>
                     <span style={{ color: '#D4C9BB', fontSize: 18 }}>›</span>
                   </div>
 
