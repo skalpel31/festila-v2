@@ -42,12 +42,11 @@ export async function deleteTable(eventId: string, tableId: string) {
   revalidatePath(`/dashboard/events/${eventId}/plan`)
 }
 
-export async function assignGuestToTable(eventId: string, guestId: string, tableId: string | null, seatX?: number, seatY?: number) {
+export async function assignGuestSeat(eventId: string, guestId: string, tableId: string | null, seatIndex: number | null) {
   const supabase = await assertOwner(eventId)
   const { error } = await supabase.from('event_guests').update({
     table_id: tableId,
-    seat_x: tableId ? seatX ?? null : null,
-    seat_y: tableId ? seatY ?? null : null,
+    seat_index: tableId !== null ? seatIndex : null,
   }).eq('id', guestId).eq('event_id', eventId)
   if (error) throw new Error("Erreur lors de l'assignation de l'invité.")
   revalidatePath(`/dashboard/events/${eventId}/plan`)

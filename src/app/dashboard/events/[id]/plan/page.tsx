@@ -18,7 +18,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
 
   const [{ data: tables }, { data: guests }] = await Promise.all([
     supabase.from('event_tables').select('*').eq('event_id', id).order('created_at', { ascending: true }),
-    supabase.from('event_guests').select('id, first_name, last_name, group_size, status, table_id, seat_x, seat_y').eq('event_id', id).order('created_at', { ascending: true }),
+    supabase.from('event_guests').select('id, first_name, last_name, group_size, status, table_id, seat_index').eq('event_id', id).order('created_at', { ascending: true }),
   ])
 
   return (
