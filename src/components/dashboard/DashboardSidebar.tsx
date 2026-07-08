@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 const C = { navy: '#0D1323', rose: '#E787B2', or: '#D4A373', cream: '#FAF7F3', sand: '#9B8E7E' }
 
@@ -21,6 +21,8 @@ const ICONS: Record<string, string> = {
   mail:     'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6',
   shield:   'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   settings: 'M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z',
+  grid:     'M3 3h8v8H3z M13 3h8v8h-8z M3 13h8v8H3z M13 13h8v8h-8z',
+  euro:     'M17 5a6.5 6.5 0 100 14 M4 10h9 M4 14h7',
 }
 
 const NAV = [
@@ -28,6 +30,13 @@ const NAV = [
   { href: '/dashboard/events',      label: 'Mes événements',  icon: 'calendar' },
   { href: '/dashboard/invitations', label: 'Mes invitations', icon: 'mail' },
   { href: '/dashboard/settings',    label: 'Paramètres',      icon: 'settings' },
+]
+
+// Sous-navigation propre à l'événement actif — s'affiche quand on est sur
+// /dashboard/events/[id] ou une de ses sous-pages (hors /new).
+const EVENT_NAV = [
+  { suffix: '',        label: 'Tableau de bord', icon: 'grid' },
+  { suffix: '/budget', label: 'Budget',          icon: 'euro' },
 ]
 
 export default function DashboardSidebar({
@@ -42,6 +51,22 @@ export default function DashboardSidebar({
   const router   = useRouter()
   const [isMobile, setIsMobile] = useState(false)
   const [isOpen,   setIsOpen]   = useState(false)
+  const [eventTitle, setEventTitle] = useState('')
+
+  const activeEventId = useMemo(() => {
+    const m = pathname.match(/^\/dashboard\/events\/([^/]+)/)
+    return m && m[1] !== 'new' ? m[1] : null
+  }, [pathname])
+
+  useEffect(() => {
+    if (!activeEventId) { setEventTitle(''); return }
+    let cancelled = false
+    const supabase = createClient()
+    supabase.from('events').select('title').eq('id', activeEventId).single().then(({ data }) => {
+      if (!cancelled) setEventTitle(data?.title ?? '')
+    })
+    return () => { cancelled = true }
+  }, [activeEventId])
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
@@ -128,6 +153,38 @@ export default function DashboardSidebar({
             </Link>
           )
         })}
+
+        {activeEventId && (
+          <>
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '12px 0 8px' }} />
+            <p style={{ fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', padding: '0 14px', marginBottom: 8 }}>
+              Événement actif
+            </p>
+            {eventTitle && (
+              <p style={{ fontSize: 13, color: C.cream, padding: '0 14px', marginBottom: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
+                {eventTitle}
+              </p>
+            )}
+            {EVENT_NAV.map(({ suffix, label, icon }) => {
+              const href = `/dashboard/events/${activeEventId}${suffix}`
+              const active = pathname === href
+              return (
+                <Link key={href} href={href} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '11px 14px', borderRadius: 10, textDecoration: 'none',
+                  background: active ? 'rgba(212,163,115,0.15)' : 'transparent',
+                  color: active ? C.or : 'rgba(255,255,255,0.55)',
+                  fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif",
+                  fontWeight: active ? 500 : 400, transition: 'all 0.2s',
+                }}>
+                  <Icon d={ICONS[icon]} size={16} />
+                  {label}
+                  {active && <div style={{ marginLeft: 'auto', width: 4, height: 4, borderRadius: '50%', background: C.or }} />}
+                </Link>
+              )
+            })}
+          </>
+        )}
 
         {isSuperAdmin && (
           <>

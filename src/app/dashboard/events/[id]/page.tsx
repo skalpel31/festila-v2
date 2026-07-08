@@ -46,7 +46,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 400, color: '#1A1208', lineHeight: 1.1, marginTop: 8 }}>
             {event.title}
           </h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
             <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: s.color, background: s.bg, padding: '3px 10px', borderRadius: 999 }}>
               {s.label}
             </span>
@@ -55,23 +55,34 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                 {event.event_type}
               </span>
             )}
-            {event.event_date && (
-              <span style={{ fontSize: 12, color: '#9B8E7E' }}>
-                {new Date(event.event_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                {event.event_time && ` à ${event.event_time.slice(0, 5)}`}
-              </span>
-            )}
-            {event.location && <span style={{ fontSize: 12, color: '#9B8E7E' }}>📍 {event.location}</span>}
           </div>
+          {(event.event_date || event.location) && (
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginTop: 12 }}>
+              {event.event_date && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, color: '#6B5E50', fontFamily: "'Inter', system-ui, sans-serif" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4B8A8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/>
+                  </svg>
+                  {new Date(event.event_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {event.event_time && ` · ${event.event_time.slice(0, 5)}`}
+                </span>
+              )}
+              {event.location && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, color: '#6B5E50', fontFamily: "'Inter', system-ui, sans-serif" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4B8A8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 6.5-9 12-9 12s-9-5.5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  {event.location}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <CopyLinkButton url={`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://festila.com'}/e/${event.slug}`} />
           <Link href={`/dashboard/events/${id}/edit`} style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, border: '1px solid #EDE3D5', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9B8E7E', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}>
             Modifier
-          </Link>
-          <Link href={`/dashboard/events/${id}/budget`} style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, border: '1px solid #EDE3D5', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9B8E7E', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}>
-            Budget
           </Link>
           <Link href={`/e/${event.slug}`} target="_blank" style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, background: '#E787B2', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 600, boxShadow: '0 4px 14px rgba(231,135,178,0.35)' }}>
             Voir la vitrine →
