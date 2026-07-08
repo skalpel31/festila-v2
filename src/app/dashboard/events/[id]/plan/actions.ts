@@ -20,7 +20,7 @@ async function assertOwner(eventId: string) {
 
 export type TableShape = 'round' | 'rect'
 
-export async function createTable(eventId: string, input: { name: string; shape: TableShape; seats: number; pos_x: number; pos_y: number }) {
+export async function createTable(eventId: string, input: { name: string; shape: TableShape; seats: number; pos_x: number; pos_y: number; rotation?: number }) {
   const supabase = await assertOwner(eventId)
   const { data, error } = await supabase.from('event_tables').insert({ event_id: eventId, ...input }).select().single()
   if (error) throw new Error("Erreur lors de la création de la table.")
@@ -28,7 +28,7 @@ export async function createTable(eventId: string, input: { name: string; shape:
   return data
 }
 
-export async function updateTable(eventId: string, tableId: string, input: Partial<{ name: string; shape: TableShape; seats: number; pos_x: number; pos_y: number }>) {
+export async function updateTable(eventId: string, tableId: string, input: Partial<{ name: string; shape: TableShape; seats: number; pos_x: number; pos_y: number; rotation: number }>) {
   const supabase = await assertOwner(eventId)
   const { error } = await supabase.from('event_tables').update(input).eq('id', tableId).eq('event_id', eventId)
   if (error) throw new Error('Erreur lors de la mise à jour de la table.')
