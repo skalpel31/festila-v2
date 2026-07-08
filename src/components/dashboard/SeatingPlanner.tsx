@@ -38,20 +38,19 @@ function seatOffsets(shape: Shape, count: number, w: number, h: number) {
       offsets.push({ x: r * Math.cos(angle), y: r * Math.sin(angle) })
     }
   } else {
-    const hw = w / 2 + OUT, hh = h / 2 + OUT
-    const segLens = [2 * hw, 2 * hh, 2 * hw, 2 * hh]
-    const total = segLens.reduce((a, b) => a + b, 0)
-    for (let i = 0; i < count; i++) {
-      let d = (total / count) * i
-      let seg = 0
-      while (d > segLens[seg]) { d -= segLens[seg]; seg++ }
-      let x = 0, y = 0
-      if (seg === 0)      { x = -hw + d; y = -hh }
-      else if (seg === 1) { x = hw;      y = -hh + d }
-      else if (seg === 2) { x = hw - d;  y = hh }
-      else                { x = -hw;     y = hh - d }
-      offsets.push({ x, y })
+    // Table rectangulaire : les places vont sur les deux grands côtés
+    // (comme une vraie table de banquet), pas sur tout le pourtour.
+    const hw = w / 2, hy = h / 2 + OUT
+    const topCount = Math.ceil(count / 2)
+    const bottomCount = count - topCount
+    const spread = (n: number, y: number) => {
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0.5 : (i + 0.5) / n
+        offsets.push({ x: -hw + t * (2 * hw), y })
+      }
     }
+    spread(topCount, -hy)
+    spread(bottomCount, hy)
   }
   return offsets
 }
@@ -60,16 +59,17 @@ function initialsOf(g: Guest) {
   return `${g.first_name?.[0] ?? ''}${g.last_name?.[0] ?? ''}`.toUpperCase() || '?'
 }
 
-function GuestAvatar({ guest }: { guest: Guest }) {
+function GuestAvatar({ guest, selected, onClick }: { guest: Guest; selected?: boolean; onClick?: () => void }) {
   return (
     <div
       draggable
       onDragStart={e => e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'guest', id: guest.id }))}
+      onClick={e => { e.stopPropagation(); onClick?.() }}
       title={`${guest.first_name} ${guest.last_name}`}
       style={{
         width: AVATAR, height: AVATAR, borderRadius: '50%',
         background: C.rose, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 600, cursor: 'grab', boxShadow: '0 2px 6px rgba(13,19,35,0.25)',
+        fontSize: 11, fontWeight: 600, cursor: 'pointer', boxShadow: selected ? `0 0 0 3px ${C.navy}` : '0 2px 6px rgba(13,19,35,0.25)',
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
@@ -78,12 +78,13 @@ function GuestAvatar({ guest }: { guest: Guest }) {
   )
 }
 
-function GuestChip({ guest }: { guest: Guest }) {
+function GuestChip({ guest, selected, onClick }: { guest: Guest; selected?: boolean; onClick?: () => void }) {
   return (
     <div
       draggable
       onDragStart={e => e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'guest', id: guest.id }))}
-      style={{ padding: '8px 12px', background: '#FAF7F3', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12.5, color: C.navy, cursor: 'grab', fontFamily: "'Inter', system-ui, sans-serif" }}
+      onClick={onClick}
+      style={{ padding: '8px 12px', background: selected ? '#FDEEF5' : '#FAF7F3', border: `1px solid ${selected ? C.rose : C.border}`, borderRadius: 8, fontSize: 12.5, color: C.navy, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {guest.first_name} {guest.last_name}{guest.group_size > 1 ? ` (+${guest.group_size - 1})` : ''}
     </div>
@@ -102,6 +103,7 @@ export default function SeatingPlanner({
   const [localTables, setLocalTables] = useState(tables)
   const [localGuests, setLocalGuests] = useState(guests)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
   useEffect(() => setLocalTables(tables), [tables])
@@ -166,6 +168,27 @@ export default function SeatingPlanner({
     assignGuestSeat(eventId, guestId, null, null).then(() => router.refresh())
   }
 
+  function toggleSelectGuest(guestId: string) {
+    setSelectedGuestId(prev => prev === guestId ? null : guestId)
+  }
+
+  function handleSeatClick(tableId: string, seatIndex: number) {
+    if (selectedGuestId) {
+      seatGuest(selectedGuestId, tableId, seatIndex)
+      setSelectedGuestId(null)
+    } else {
+      const occupant = seatMap.get(`${tableId}:${seatIndex}`)
+      if (occupant) setSelectedGuestId(occupant.id)
+    }
+  }
+
+  function handleUnassignedPanelClick() {
+    if (selectedGuestId) {
+      unassignGuest(selectedGuestId)
+      setSelectedGuestId(null)
+    }
+  }
+
   async function handleDeleteTable(tableId: string, name: string) {
     if (!window.confirm(`Supprimer "${name}" ? Les invités qui y sont assignés repasseront en "non assignés".`)) return
     setSelectedId(null)
@@ -181,7 +204,15 @@ export default function SeatingPlanner({
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 20, alignItems: 'start' }}>
+    <div className="seating-grid">
+      <style>{`
+        .seating-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+        .seating-canvas { height: 560px; }
+        @media (max-width: 768px) {
+          .seating-grid { grid-template-columns: 1fr; }
+          .seating-canvas { height: 380px; }
+        }
+      `}</style>
 
       <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -232,7 +263,8 @@ export default function SeatingPlanner({
           ref={canvasRef}
           onDragOver={e => e.preventDefault()}
           onDrop={handleCanvasDrop}
-          style={{ position: 'relative', width: '100%', height: 560, background: '#FAF7F3', border: `1px dashed ${C.border}`, borderRadius: 14, overflow: 'hidden' }}
+          className="seating-canvas"
+          style={{ position: 'relative', width: '100%', background: '#FAF7F3', border: `1px dashed ${C.border}`, borderRadius: 14, overflow: 'hidden' }}
         >
           {localTables.length === 0 && (
             <p style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.sand, fontSize: 13, textAlign: 'center', padding: 24 }}>
@@ -291,6 +323,7 @@ export default function SeatingPlanner({
                       key={i}
                       onDragOver={e => e.preventDefault()}
                       onDrop={e => { e.stopPropagation(); const d = dragData(e); if (d?.kind === 'guest') seatGuest(d.id, table.id, i) }}
+                      onClick={e => { e.stopPropagation(); handleSeatClick(table.id, i) }}
                       style={{
                         position: 'absolute',
                         left: w / 2 + off.x, top: h / 2 + off.y,
@@ -298,9 +331,13 @@ export default function SeatingPlanner({
                       }}
                     >
                       {occupant ? (
-                        <GuestAvatar guest={occupant} />
+                        <GuestAvatar guest={occupant} selected={selectedGuestId === occupant.id} onClick={() => toggleSelectGuest(occupant.id)} />
                       ) : (
-                        <div style={{ width: SLOT, height: SLOT, borderRadius: '50%', border: `1.5px dashed ${C.border}`, background: 'rgba(255,255,255,0.6)' }} />
+                        <div style={{
+                          width: SLOT, height: SLOT, borderRadius: '50%', cursor: 'pointer',
+                          border: `1.5px dashed ${selectedGuestId ? C.rose : C.border}`,
+                          background: selectedGuestId ? '#FDEEF5' : 'rgba(255,255,255,0.6)',
+                        }} />
                       )}
                     </div>
                   )
@@ -314,7 +351,8 @@ export default function SeatingPlanner({
       <div
         onDragOver={e => e.preventDefault()}
         onDrop={e => { const d = dragData(e); if (d?.kind === 'guest') unassignGuest(d.id) }}
-        style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}
+        onClick={handleUnassignedPanelClick}
+        style={{ background: '#fff', border: `1px solid ${selectedGuestId ? C.rose : C.border}`, borderRadius: 16, padding: 20 }}
       >
         <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 20, fontWeight: 400, color: '#1A1208', marginBottom: 14 }}>
           Invités non assignés
@@ -325,11 +363,13 @@ export default function SeatingPlanner({
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {unassigned.map(g => <GuestChip key={g.id} guest={g} />)}
+            {unassigned.map(g => (
+              <GuestChip key={g.id} guest={g} selected={selectedGuestId === g.id} onClick={() => toggleSelectGuest(g.id)} />
+            ))}
           </div>
         )}
         <p style={{ fontSize: 11, color: C.sand, marginTop: 16, lineHeight: 1.6 }}>
-          Glisse un invité sur la place précise que tu veux. Dépose-le sur une place déjà occupée pour échanger, ou ici pour le retirer.
+          Glisse (ou touche puis touche une place) un invité pour l'assigner. Sur une place occupée : échange. Ici : retire.
         </p>
       </div>
 
