@@ -70,6 +70,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           <Link href={`/dashboard/events/${id}/edit`} style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, border: '1px solid #EDE3D5', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9B8E7E', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}>
             Modifier
           </Link>
+          <Link href={`/dashboard/events/${id}/budget`} style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, border: '1px solid #EDE3D5', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9B8E7E', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}>
+            Budget
+          </Link>
           <Link href={`/e/${event.slug}`} target="_blank" style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 20px', borderRadius: 999, background: '#E787B2', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff', textDecoration: 'none', fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 600, boxShadow: '0 4px 14px rgba(231,135,178,0.35)' }}>
             Voir la vitrine →
           </Link>
