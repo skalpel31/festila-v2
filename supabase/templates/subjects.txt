@@ -1,0 +1,4 @@
+reset-password: Réinitialisez votre mot de passe Festila
+confirm-signup: Bienvenue sur Festila — confirmez votre adresse email
+magic-link: Votre lien de connexion Festila
+change-email: Confirmez votre nouvelle adresse email Festila
