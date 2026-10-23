@@ -30,12 +30,15 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     // Le lien de reset Supabase (flux PKCE) redirige vers /reset-password?code=...
+    // Le client navigateur échange lui-même ce code à l'initialisation (detectSessionInUrl) :
+    // le réessayer ici échoue (code déjà consommé) alors que la session est bien créée.
+    // On attend donc juste la fin de l'initialisation et on vérifie qu'une session existe.
     const code = searchParams.get('code')
     if (!code) { setLinkError(true); return }
 
     const supabase = createClient()
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error) { setLinkError(true); return }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) { setLinkError(true); return }
       setReady(true)
     })
   }, [searchParams])
